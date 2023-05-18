@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:tx="http://www.springframework.org/schema/tx" xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context.xsd
+       http://www.springframework.org/schema/tx
+       http://www.springframework.org/schema/tx/spring-tx.xsd http://www.springframework.org/schema/aop https://www.springframework.org/schema/aop/spring-aop.xsd">
+    <!-- 读取数据库连接信息的属性文件 处于什么位置, classpath相当于resource路径,也叫类路径-->
+    <context:property-placeholder location="classpath:db.properties"/>
+    <!-- 通过bean配置数据源 暂时演druid的配置方式   -->
+    <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource">
+        <property name="driverClassName" value="${db.driverClass}"/>
+        <property name="url" value="${db.url}"/>
+        <property name="username" value="${db.username}"/>
+        <property name="password" value="${db.password}"/>
+    </bean>
+    <!--工厂bean, 生成SqlSessionFactory对象-->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <!--配置数据源, 引用是上面配置过的数据源-->
+        <property name="dataSource" ref="dataSource"/>
+        <!-- mappers 也就是xml文件位置-->
+        <property name="mapperLocations"  value="classpath:mappers/*.xml"></property>
+        <!-- 实体类的别名 -->
+        <property name="typeAliasesPackage" value="com.qf.entity"/>
+    </bean>
+
+    <!-- 告诉spring 我们的mapper接口在哪, 让spring自己去扫描接口的包,生成代理对象 -->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="com.qf.dao"/>
+    </bean>
+
+
+
+    <!-- 添加servicebean ,别忘了在里面写set方法 -->
+    <bean id="accountService" class="com.qf.service.impl.AccountServiceImpl">
+        <property name="accoutnMapper" ref="accoutnMapper"/>
+    </bean>
+
+    <!-- 事务核心管理器,封装了所有事务操作. 依赖于连接池 -->
+    <!-- 1. 引入一个事务管理器，其中依赖DataSource,借以获得连接，进而控制事务逻辑 -->
+    <bean id="tx" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"></property>
+    </bean>
+
+    <!-- 配置事务通知 -->
+    <tx:advice id="txAdvice" transaction-manager="tx">
+        <tx:attributes>
+            <!-- 企业中配置CRUD方法一般使用方法名+通配符*的形式配置通知，此时类中的方法名要和配置的方法名一致 -->
+            <!-- 以方法为单位,指定方法应用什么事务属性
+                    isolation：用于指定事务的隔离级别。默认值是DEFAULT，表示使用数据库的默认隔离级别。
+                    propagation：用于指定事务的传播行为。默认值是REQUIRED，表示一定会有事务，增删改的选择。查询方法可以选择SUPPORTS。
+                    read-only：用于指定事务是否只读。只有查询方法才能设置为true。默认值是false，表示读写。
+                    timeout：用于指定事务的超时时间，默认值是-1，表示永不超时。如果指定了数值，以秒为单位。
+                    rollback-for：用于指定一个异常，当产生该异常时，事务回滚，产生其他异常时，事务不回滚。没有默认值。表示任何异常都回滚。
+                    no-rollback-for：用于指定一个异常，当产生该异常时，事务不回滚，产生其他异常时事务回滚。没有默认值。表示任何异常都回滚。
+                 -->
+            <tx:method name="save*" isolation="REPEATABLE_READ"
+                       propagation="REQUIRED" read-only="false" />
+            <tx:method name="add*" isolation="REPEATABLE_READ"
+                       propagation="REQUIRED" read-only="false" />
+            <tx:method name="update*" isolation="REPEATABLE_READ"
+                       propagation="REQUIRED" read-only="false" />
+            <tx:method name="modify*" isolation="REPEATABLE_READ"
+                       propagation="REQUIRED" read-only="false" />
+            <tx:method name="delete*" isolation="REPEATABLE_READ"
+                       propagation="REQUIRED" read-only="false" />
+            <tx:method name="remove*" isolation="REPEATABLE_READ"
+                       propagation="REQUIRED" read-only="false" />
+            <tx:method name="get*" isolation="REPEATABLE_READ"
+                       propagation="REQUIRED" read-only="true" />
+            <tx:method name="find*" isolation="REPEATABLE_READ"
+                       propagation="REQUIRED" read-only="true" />
+
+            <tx:method name="transfer" isolation="REPEATABLE_READ"
+                       propagation="REQUIRED" read-only="false" />
+        </tx:attributes>
+    </tx:advice>
+
+    <!-- 配置织入 -->
+    <aop:config>
+        <!-- 配置切点表达式 -->
+        <aop:pointcut expression="execution(* com.qf.service.impl.*ServiceImpl.*(..))" id="txPc" />
+        <!-- 配置切面 : 通知+切点 advice-ref:通知的名称 pointcut-ref:切点的名称 -->
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="txPc" />
+    </aop:config>
+</beans>
